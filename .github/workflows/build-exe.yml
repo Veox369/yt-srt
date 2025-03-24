@@ -1,46 +1,50 @@
-name: Build EXE
+name: Build Executable
 
 on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version'
-        required: true
-
-permissions:
-  contents: write  # Required for creating releases
 
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '14'
+        node-version: '18'
+        cache: 'npm'
+
     - name: Install dependencies
-      run: npm install
-    - name: Build EXE
+      run: npm ci
+
+    - name: Create public directory if it doesn't exist
+      run: |
+        if (!(Test-Path -Path "public")) {
+          New-Item -ItemType Directory -Path "public"
+          Copy-Item -Path "index.html" -Destination "public/"
+        }
+
+    - name: Build executable
       run: npm run build
-    - name: Compress EXE and public folder
+
+    - name: Create release zip
       run: npm run compress
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload executable as artifact
+      uses: actions/upload-artifact@v4
       with:
-        tag_name: v${{ inputs.version }}
-        release_name: Release v${{ inputs.version }}
-        draft: false
-        prerelease: false
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: CaptionAI
+        path: dist/CaptionAI.exe
+
+    - name: Upload zip as artifact
+      uses: actions/upload-artifact@v4
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/CaptionAI-release.zip
-        asset_name: CaptionAI-release.zip
-        asset_content_type: application/zip
+        name: CaptionAI-release
+        path: dist/CaptionAI-release.zip
